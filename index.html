@@ -347,6 +347,15 @@ body:not(.ads-on) .adslot{display:none!important}
 <div id="modal" class="hidden"><div class="panel"><p id="modalText"></p><div class="row"><button class="btn red" id="modalYes">Yes</button><button class="btn dark" id="modalNo">No</button></div></div></div>
 <div id="toast"></div>
 <script>
+/* GA4 custom events (Games by Zaib). Safe: never throws, light (no per-frame calls, dedupe + per-page cap). */
+var ZT_N = 0, ZT_K = '', ZT_KT = 0, ZT_T = 0, ZT_S = 0, ZT_H = 0;
+function zt(n, p) { try { var k = n + JSON.stringify(p || 0), t = Date.now(); if (ZT_N > 150 || (k === ZT_K && t - ZT_KT < 500)) return; ZT_N++; ZT_K = k; ZT_KT = t; window.gtag && gtag('event', n, Object.assign({ game_id: 'meowstronauts' }, p)); } catch (e) {} }
+function ztPlay(on) { try { var t = Date.now(); if (ZT_S) { ZT_T += (t - ZT_S) / 1e3; ZT_S = 0; } if (on) ZT_S = t; } catch (e) {} }
+function ztPing(r) { try { ztPlay(false); if (ZT_T >= 1) zt('play_time', { play_time: Math.round(ZT_T), reason: r }); ZT_T = 0; } catch (e) {} }
+try {
+  document.addEventListener('visibilitychange', function () { if (document.hidden) { ZT_H = !!ZT_S; ztPing('page_hide'); } else if (ZT_H) { ZT_H = 0; ztPlay(true); } });
+  document.addEventListener('click', function (e) { try { var a = e.target && e.target.closest && e.target.closest('a[href]'); if (!a) return; var u = new URL(a.href, location.href); if (!/^https?:$/.test(u.protocol)) return; if (u.host === location.host || /(^|\.)zaibgames\.com$/.test(u.host)) { if (u.pathname.indexOf('/meowstronauts/') !== 0) zt('more_games_click', { link_url: u.href }); } else zt('outbound_click', { link_url: u.href, link_domain: u.host, outbound: true }); } catch (err) {} }, true);
+} catch (e) {}
 'use strict';
 // ================= Meowstronauts by Zaib — core =================
 const $ = s => document.querySelector(s), $$ = s => Array.from(document.querySelectorAll(s));
@@ -1230,6 +1239,7 @@ function startFlight(mode, pi, two) {
   if (two) { const c1 = SV.p1cat || 0; players.push(mkPlayer(0, c1), mkPlayer(1, 1 - c1)); }
   else players.push(mkPlayer(0, SV.cat || 0));
   G.state = 'intro'; G.introT = 0;
+  { const zm = mode + (two ? '_2p' : ''); zt('game_start', { mode: zm, level: pi + 1 }); if (mode === 'story') zt('level_start', { level: pi + 1, level_name: PLANETS[pi].name, mode: zm }); ztPlay(true); }
   const P = P_();
   bannerShow(mode === 'endless' ? 'ENDLESS VOYAGE' : P.name.toUpperCase(), mode === 'endless' ? 'How far can you fly?' : 'Planet ' + (pi + 1) + ' · ' + P.sub, P.col, 2.4);
   AU.play(mode === 'endless' ? P.mus : P.mus);
@@ -1716,6 +1726,12 @@ function finishFlight(won) {
     if (G.dist > SV.bestEnd) { SV.bestEnd = Math.round(G.dist); r.newBest = true; }
     r.revivable = !G.revived && SV.fish + G.fishGot >= reviveCost();
   }
+  { const zm = G.mode + (G.two ? '_2p' : '');
+    if (G.mode === 'story') zt('level_end', { level: G.pi + 1, level_name: PLANETS[G.pi].name, success: !!won, mode: zm, score: r.score });
+    if (!won) zt('game_over', { score: r.score, level: G.pi + 1, mode: zm, distance: r.dist });
+    if (r.score > SV.bestScore || r.newBest) zt('post_score', { score: r.score, level: G.pi + 1, mode: zm });
+    if (won && r.first && G.pi + 1 < PLANETS.length) zt('unlock_achievement', { achievement_id: 'planet_' + (G.pi + 2) });
+    ztPing(won ? 'level_clear' : 'game_over'); }
   if (r.score > SV.bestScore) SV.bestScore = r.score;
   r.earned = r.fish + r.bonus;
   G.result = r; G.state = 'results';
@@ -1724,11 +1740,11 @@ function finishFlight(won) {
 }
 const reviveCost = () => 150 + (G.mode === 'story' ? G.pi * 25 : 0);
 function bankResult() { // called when leaving results without revive
-  const r = G.result; if (!r || r.banked) return; r.banked = true; SV.fish += r.earned; saveNow();
+  const r = G.result; if (!r || r.banked) return; r.banked = true; SV.fish += r.earned; saveNow(); if (r.earned > 0) zt('earn_virtual_currency', { virtual_currency_name: 'coins', value: r.earned, item_name: r.mode + '_run' });
 }
 function doRevive() {
   const r = G.result; if (!r || !r.revivable) return false;
-  const cost = reviveCost(); G.fishGot -= cost; if (G.fishGot < 0) { SV.fish += G.fishGot; G.fishGot = 0; }
+  const cost = reviveCost(); zt('spend_virtual_currency', { virtual_currency_name: 'coins', value: cost, item_name: 'revive' }); ztPlay(true); G.fishGot -= cost; if (G.fishGot < 0) { SV.fish += G.fishGot; G.fishGot = 0; }
   G.revived = true; G.result = null;
   for (const p of players) { p.down = false; p.hearts = p.maxH; p.inv = 3; setExpr(p, 'happy', 2); sparks(p.x, p.y, '#9dff4a', 30, 260); }
   ebul.length = 0; beams.length = 0; for (const e of enemies) if (!e.solid && e.x < VW * 0.5) e.dead = true;
@@ -2377,7 +2393,7 @@ function buildMissions() {
     d.innerHTML = `<div class="mb"><div class="mn">${m.name}</div><div class="md">${m.desc} · ${fmt(v)}/${fmt(m.goal)}</div><div class="bar"><i style="width:${v / m.goal * 100}%"></i></div></div>`;
     const b = document.createElement('button'); b.className = 'btn small ' + (ok && !cl ? 'gold pulse' : 'dark');
     b.innerHTML = cl ? '✓' : `<span class="cost"><i></i>${m.reward}</span>`; b.disabled = !ok || cl;
-    b.onclick = () => { if (!ok || cl) return; SV.claimed[m.id] = 1; SV.fish += m.reward; saveNow(); AU.S.buy(); toast('+' + m.reward + ' fish!'); buildMissions(); refreshFish(); };
+    b.onclick = () => { if (!ok || cl) return; SV.claimed[m.id] = 1; SV.fish += m.reward; zt('unlock_achievement', { achievement_id: m.id }); zt('earn_virtual_currency', { virtual_currency_name: 'coins', value: m.reward, item_name: 'mission_' + m.id }); saveNow(); AU.S.buy(); toast('+' + m.reward + ' fish!'); buildMissions(); refreshFish(); };
     d.appendChild(b); box.appendChild(d);
   });
   $('#missNote').textContent = done + ' / ' + MISSIONS.length + ' missions complete · ★ ' + starCount(SV) + ' / 18 stars';
@@ -2407,7 +2423,7 @@ function buildShop() {
       d.insertAdjacentHTML('beforeend', `<div class="ib"><div class="in">${u.name}</div><div class="id">${u.desc}</div><div class="pips">${Array.from({ length: u.max }, (_, i) => `<i class="${i < lv ? 'on' : ''}"></i>`).join('')}</div></div>`);
       const b = document.createElement('button'); b.className = 'btn small ' + (max ? 'dark' : SV.fish >= cost ? 'gold' : 'dark');
       b.innerHTML = max ? 'MAX' : `<span class="cost"><i></i>${fmt(cost)}</span>`; b.disabled = max;
-      b.onclick = () => { if (max) return; if (SV.fish < cost) { toast('Need ' + fmt(cost - SV.fish) + ' more fish'); return; } SV.fish -= cost; SV.up[u.id] = lv + 1; saveNow(); AU.S.buy(); buildShop(); refreshFish(); };
+      b.onclick = () => { if (max) return; if (SV.fish < cost) { toast('Need ' + fmt(cost - SV.fish) + ' more fish'); return; } SV.fish -= cost; SV.up[u.id] = lv + 1; zt('spend_virtual_currency', { virtual_currency_name: 'coins', value: cost, item_name: u.name + ' ' + (lv + 1) }); saveNow(); AU.S.buy(); buildShop(); refreshFish(); };
       d.appendChild(b); box.appendChild(d);
     });
   } else {
@@ -2423,7 +2439,7 @@ function buildShop() {
       const b = document.createElement('button'); b.className = 'btn small ' + (eq ? 'lime' : own ? 'cyan' : SV.fish >= it.price ? 'gold' : 'dark');
       b.innerHTML = eq ? '✓' : own ? 'Equip' : `<span class="cost"><i></i>${fmt(it.price)}</span>`;
       b.onclick = () => {
-        if (!own) { if (SV.fish < it.price) { toast('Need ' + fmt(it.price - SV.fish) + ' more fish'); previewOverride = key === 'hat' ? [it.id, null] : [null, it.id]; return; } SV.fish -= it.price; owned.push(it.id); AU.S.buy(); toast(it.name + ' unlocked!'); }
+        if (!own) { if (SV.fish < it.price) { toast('Need ' + fmt(it.price - SV.fish) + ' more fish'); previewOverride = key === 'hat' ? [it.id, null] : [null, it.id]; return; } SV.fish -= it.price; owned.push(it.id); zt('spend_virtual_currency', { virtual_currency_name: 'coins', value: it.price, item_name: it.name, item_category: key }); AU.S.buy(); toast(it.name + ' unlocked!'); }
         SV.eq[shopCat][key] = it.id; saveNow(); AU.S.meow(CATS[shopCat].voice, 0.3, 0.35); buildShop(); refreshFish();
       };
       d.appendChild(b); box.appendChild(d);
@@ -2441,9 +2457,9 @@ function buildSettings() {
   $$('#scrSettings .tog').forEach(t => t.classList.toggle('on', !!SV.set[t.dataset.set]));
   $$('#scrSettings .seg').forEach(s => s.querySelectorAll('button').forEach(b => b.classList.toggle('on', String(SV.set[s.dataset.seg]) === b.dataset.v)));
 }
-$$('#scrSettings .tog').forEach(t => t.onclick = () => { const k = t.dataset.set; SV.set[k] = !SV.set[k]; saveNow(); buildSettings(); AU.setVol(); if (k === 'vib' && SV.set.vib) AU.vibe(40); });
+$$('#scrSettings .tog').forEach(t => t.onclick = () => { const k = t.dataset.set; SV.set[k] = !SV.set[k]; zt('settings_change', { setting: k, value: String(SV.set[k]) }); saveNow(); buildSettings(); AU.setVol(); if (k === 'vib' && SV.set.vib) AU.vibe(40); });
 $$('#scrSettings .seg').forEach(s => s.querySelectorAll('button').forEach(b => b.onclick = () => {
-  const k = s.dataset.seg; let v = b.dataset.v; if (k === 'diff') v = +v; SV.set[k] = v; saveNow(); buildSettings();
+  const k = s.dataset.seg; let v = b.dataset.v; if (k === 'diff') v = +v; SV.set[k] = v; zt('settings_change', { setting: k, value: String(v) }); saveNow(); buildSettings();
   if (k === 'q') applyQuality();
   if (k === 'ctrl') clearTouches();
 }));
