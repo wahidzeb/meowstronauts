@@ -1,0 +1,42 @@
+{
+  "id": "/meowstronauts/",
+  "name": "Meowstronauts",
+  "short_name": "Meowstronauts",
+  "description": "Meowstronauts by Zaib - two space cats, a yellow cat and a black cat, fly their rockets across the galaxy. Dodge asteroids, collect fish stars, blast space mice and robot bosses. 1 or 2 players.",
+  "lang": "en",
+  "start_url": "/meowstronauts/?source=pwa",
+  "scope": "/meowstronauts/",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#0c0726",
+  "background_color": "#0c0726",
+  "categories": [
+    "games"
+  ],
+  "icons": [
+    {
+      "src": "/meowstronauts/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/meowstronauts/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/meowstronauts/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/meowstronauts/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
